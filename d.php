@@ -277,7 +277,7 @@ layui.use(['form'], function(){
         return "地址不能为空";
       }
       var url_reg = /((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/;
-      if(!url_reg.test(value)) {
+      if(!url_reg.test(decodeURIComponent(value))) {
       	return "无效的网址";
       }
     }
@@ -285,7 +285,7 @@ layui.use(['form'], function(){
   
   //监听提交
   form.on('submit(submitBtn)', function(data) {
-  	var url = encodeURIComponent(data.field['content']);
+  	var url = encodeURIComponent(decodeURIComponent(data.field['content']));
     window.open(window.location.pathname + "?url=" + url, '_blank');
     return false;
   });
