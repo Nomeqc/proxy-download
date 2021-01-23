@@ -285,7 +285,7 @@ layui.use(['form'], function(){
   
   //监听提交
   form.on('submit(submitBtn)', function(data) {
-  	var url = encodeURIComponent(decodeURIComponent(data.field['content']));
+    var url = encodeURIComponent(decodeURIComponent(data.field['content']));
     window.open(window.location.pathname + "?url=" + url, '_blank');
     return false;
   });
