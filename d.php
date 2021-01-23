@@ -1,19 +1,21 @@
 <?php
-@error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
+@error_reporting(E_ALL &~E_NOTICE &~E_WARNING);
 @set_time_limit(0);
 
-function die_echo_404_message($message) {
+function die_echo_404_message($message)
+{
 	header("HTTP/1.1 404 Not Found");
-    header("Content-Type: text/plain; charset=utf-8");
-    die($message);
+	header("Content-Type: text/plain; charset=utf-8");
+	die($message);
 }
 
-function check_url($url) {
-	if(strpos($url, '//') === false) {
+function check_url($url)
+{
+	if (null === parse_url($url, PHP_URL_SCHEME)) {
 		$url = 'http://' . $url;
 	}
 	$url_reg = '%^(?:(?:https?|ftp)://)(?:\S+(?::\S*)?@|\d{1,3}(?:\.\d{1,3}){3}|(?:(?:[a-z\d\x{00a1}-\x{ffff}]+-?)*[a-z\d\x{00a1}-\x{ffff}]+)(?:\.(?:[a-z\d\x{00a1}-\x{ffff}]+-?)*[a-z\d\x{00a1}-\x{ffff}]+)*(?:\.[a-z\x{00a1}-\x{ffff}]{2,6}))(?::\d+)?(?:[^\s]*)?$%iu';
-	if(!preg_match($url_reg, $url)) {
+	if (!preg_match($url_reg, $url)) {
 		die_echo_404_message('无效的网址');
 	}
 	return $url;
@@ -25,9 +27,9 @@ $play = (bool)$_GET['play'];
 
 if ($play && !empty($url)) {
 	$url = check_url($url);
-    $url = urlencode($url);
-    header('Content-Type: text/html; charset=utf-8');
-    echo <<<EOF
+	$url = urlencode($url);
+	header('Content-Type: text/html; charset=utf-8');
+	echo <<<EOF
 <!doctype html>
 <html>
 <head>
@@ -46,180 +48,171 @@ if ($play && !empty($url)) {
 </body>
 </html>
 EOF;
-    return;
+	return;
 }
 
-function get_final_url($url) {
+function get_final_url($url)
+{
 	$curl = curl_init();
-	curl_setopt_array($curl, array(
-	  CURLOPT_URL => $url,
-	  CURLOPT_RETURNTRANSFER => true,
-	  CURLOPT_ENCODING => "",
-	  CURLOPT_FOLLOWLOCATION => true,
-	  CURLOPT_MAXREDIRS => 10,
-	  CURLOPT_TIMEOUT => 30,
-	  CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-	  CURLOPT_CUSTOMREQUEST => "GET",
-	  CURLOPT_NOBODY => true,
-	));
-	
+	curl_setopt_array(
+		$curl,
+		array(
+			CURLOPT_URL => $url,
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_ENCODING => "",
+			CURLOPT_FOLLOWLOCATION => true,
+			CURLOPT_MAXREDIRS => 10,
+			CURLOPT_TIMEOUT => 30,
+			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			CURLOPT_CUSTOMREQUEST => "GET",
+			CURLOPT_NOBODY => true,
+		)
+	);
+
 	$response = curl_exec($curl);
 	$err = curl_error($curl);
 	$final_url = curl_getinfo($curl, CURLINFO_EFFECTIVE_URL);
 	curl_close($curl);
-	
+
 	if ($err) {
-	  die_echo_404_message('File not found.');
+		die_echo_404_message('File not found.');
 	}
-	
+
 	return $final_url;
 }
 
-
-if(!empty($url)) {
+if (!empty($url)) {
 	$file_name = trim(urldecode($_GET['filename']));
-	
+
 	$url = check_url($url);
-	
+
 	$url = get_final_url($url);
-	
-    $urlArgs = parse_url($url);
-    
-    $host = $urlArgs['host'];
-    $requestUri = $urlArgs['path'];
-    
-    if (isset($urlArgs['query'])) {
-    	$requestUri .= '?' . $urlArgs['query'];
-    }
-    
-    $protocol = ($urlArgs['scheme'] == 'http') ? 'tcp' : 'ssl';
-    $port = $urlArgs['port'];
-    
-    if (empty($port)) {
-    	$port = ($protocol == 'tcp') ? 80 : 443;
-    }
-    
-    $header = "{$_SERVER['REQUEST_METHOD']} {$requestUri} HTTP/1.1\r\nHost: {$host}\r\n";
-    
-    unset($_SERVER['HTTP_HOST']);
-    $_SERVER['HTTP_CONNECTION'] = 'close';
-    
-    if ($_SERVER['CONTENT_TYPE']) {
-        $_SERVER['HTTP_CONTENT_TYPE'] = $_SERVER['CONTENT_TYPE'];
-    }
-    
-    foreach ($_SERVER as $x => $v) {
-        if (substr($x, 0, 5) !== 'HTTP_') {
-            continue;
-        }
-        $x = strtr(ucwords(strtr(strtolower(substr($x, 5)), '_', ' ')), ' ', '-');
-        $header .= "{$x}: {$v}\r\n";
-    }
-    
-    $header .= "\r\n";
 
-    $remote = "{$protocol}://{$host}:{$port}";
-    
-    $context = stream_context_create();
-    stream_context_set_option($context, 'ssl', 'verify_host', false);
+	$urlArgs = parse_url($url);
 
-    $p = stream_socket_client($remote, $err, $errstr, 60, STREAM_CLIENT_CONNECT, $context);
-    
-    if (!$p) {
-        exit;
-    }
-    
-    fwrite($p, $header);
-    
-    $pp = fopen('php://input', 'r');
-    
-    while ($pp && !feof($pp)) {
-        fwrite($p, fread($pp, 1024));
-    }
-    
-    fclose($pp);
-    
-    $header = '';
-    
-    $x = 0;
-    $len = false;
-    $off = 0;
-    
-    while (!feof($p)) {
-        if ($x == 0) {
-            $header .= fread($p, 1024);
-    		
-            if (($i = strpos($header, "\r\n\r\n")) !== false) {
-                $x = 1;
-                $n = substr($header, $i + 4);
-                $header = substr($header, 0, $i);
-                $has_suggest_name = (strpos($header, "Content-Disposition:") !== false);
-                $header = explode("\r\n", $header);
-                foreach ($header as $m) {
-                    if (preg_match('!^\\s*content-length\\s*:!is', $m)) {
-                        $len = trim(substr($m, 15));
-                    }
-                    header($m);
-                }
-                
-                if(!empty($file_name)) {
-                	$my_name = trim(pathinfo($file_name, PATHINFO_FILENAME));
-                	$my_ext = trim(pathinfo($file_name, PATHINFO_EXTENSION));
-                	if(empty($my_name)) {
-                		$my_name = 'download';
-                	}
-                	$file_name = $my_name;
-                	if(!empty($my_ext)) {
-                		$file_name = $file_name . '.' . $my_ext;
-                	}
-                	
-                	$encoded_filename = rawurlencode($file_name);
-                	$ua = $_SERVER["HTTP_USER_AGENT"];
-			        // //IE
-		            if (preg_match("/MSIE/", $ua)) {
-					     header('Content-Disposition: attachment; filename="' . $file_name . '"');
-					} else {
-					     header( 'Content-Disposition: attachment; filename*=UTF-8\'\'' . $encoded_filename );
+	$host = $urlArgs['host'];
+	$requestUri = $urlArgs['path'];
+
+	if (isset($urlArgs['query'])) {
+		$requestUri .= '?' . $urlArgs['query'];
+	}
+
+	$protocol = ($urlArgs['scheme'] == 'http') ? 'tcp' : 'ssl';
+	$port = $urlArgs['port'];
+
+	if (empty($port)) {
+		$port = ($protocol == 'tcp') ? 80 : 443;
+	}
+
+	$header = "{$_SERVER['REQUEST_METHOD']} {$requestUri} HTTP/1.1\r\nHost: {$host}\r\n";
+
+	unset($_SERVER['HTTP_HOST']);
+	$_SERVER['HTTP_CONNECTION'] = 'close';
+
+	if ($_SERVER['CONTENT_TYPE']) {
+		$_SERVER['HTTP_CONTENT_TYPE'] = $_SERVER['CONTENT_TYPE'];
+	}
+
+	foreach ($_SERVER as $x => $v) {
+		if (substr($x, 0, 5) !== 'HTTP_') {
+			continue;
+		}
+		$x = strtr(ucwords(strtr(strtolower(substr($x, 5)), '_', ' ')), ' ', '-');
+		$header .= "{$x}: {$v}\r\n";
+	}
+
+	$header .= "\r\n";
+
+	$remote = "{$protocol}://{$host}:{$port}";
+
+	$context = stream_context_create();
+	stream_context_set_option($context, 'ssl', 'verify_host', false);
+
+	$p = stream_socket_client($remote, $err, $errstr, 60, STREAM_CLIENT_CONNECT, $context);
+
+	if (!$p) {
+		exit;
+	}
+
+	fwrite($p, $header);
+
+	$pp = fopen('php://input', 'r');
+
+	while ($pp && !feof($pp)) {
+		fwrite($p, fread($pp, 1024));
+	}
+
+	fclose($pp);
+
+	$header = '';
+
+	$x = 0;
+	$len = false;
+	$off = 0;
+
+	while (!feof($p)) {
+		if ($x == 0) {
+			$header .= fread($p, 1024);
+
+			if (($i = strpos($header, "\r\n\r\n")) !== false) {
+				$x = 1;
+				$n = substr($header, $i + 4);
+				$header = substr($header, 0, $i);
+				$has_suggest_name = (strpos($header, "Content-Disposition:") !== false);
+				$header = explode("\r\n", $header);
+				foreach ($header as $m) {
+					if (preg_match('!^\\s*content-length\\s*:!is', $m)) {
+						$len = trim(substr($m, 15));
 					}
-                } else if(!$has_suggest_name) {//如果服务器没有返回推荐文件名，则添加
-                	$name = trim(pathinfo($origin_url, PATHINFO_FILENAME));
-	                $ext = trim(pathinfo($origin_url, PATHINFO_EXTENSION));
-                	if(empty($name)) {
-                		$name = 'download';
-                	}
-                	$file_name = $name;
-                	if(!empty($ext)) {
-                		$file_name = $file_name . '.' . $ext;
-                	}
-                
-                	$encoded_filename = rawurlencode($file_name);
-                	$ua = $_SERVER["HTTP_USER_AGENT"];
-                	if (preg_match("/MSIE/", $ua)) {
-					     header('Content-Disposition: attachment; filename="' . $file_name . '"');
-					} else {
-					     header( 'Content-Disposition: attachment; filename*=UTF-8\'\'' . $encoded_filename );
+					header($m);
+				}
+
+				if (!empty($file_name)) {
+					$my_name = trim(pathinfo($file_name, PATHINFO_FILENAME));
+					$my_ext = trim(pathinfo($file_name, PATHINFO_EXTENSION));
+					if (empty($my_name)) {
+						$my_name = 'download';
 					}
-                }
-                
-                
-                
-                $off = strlen($n);
-                echo $n;
-                flush();
-            }
-        } else {
-            if ($len !== false && $off >= $len) {
-                break;
-            }
-            $n = fread($p, 1024);
-            $off += strlen($n);
-            echo $n;
-            flush();
-        }
-    }
-    
-    fclose($p);
-    return;
+					$file_name = $my_name;
+					if (!empty($my_ext)) {
+						$file_name = $file_name . '.' . $my_ext;
+					}
+
+					$encoded_filename = rawurlencode($file_name);
+					header('Content-Disposition: attachment; filename="' . $encoded_filename . '"; filename*=UTF-8\'\'' . $encoded_filename);
+				  //如果服务器没有返回推荐文件名，则添加
+				} else if (!$has_suggest_name) {
+					$name = trim(pathinfo($origin_url, PATHINFO_FILENAME));
+					$ext = trim(pathinfo($origin_url, PATHINFO_EXTENSION));
+					if (empty($name)) {
+						$name = 'download';
+					}
+					$file_name = $name;
+					if (!empty($ext)) {
+						$file_name = $file_name . '.' . $ext;
+					}
+
+					$encoded_filename = rawurlencode($file_name);
+					header('Content-Disposition: attachment; filename="' . $encoded_filename . '"; filename*=UTF-8\'\'' . $encoded_filename);
+				}
+
+				$off = strlen($n);
+				echo $n;
+				flush();
+			}
+		} else {
+			if ($len !== false && $off >= $len) {
+				break;
+			}
+			$n = fread($p, 1024);
+			$off += strlen($n);
+			echo $n;
+			flush();
+		}
+	}
+
+	fclose($p);
+	return;
 }
 
 header('Content-Type: text/html; charset=utf-8');
